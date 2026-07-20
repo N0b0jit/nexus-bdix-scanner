@@ -239,6 +239,7 @@ input[type="file"] { display: none; }
 .results-list .online { border-left: 3px solid var(--status-success); }
 .results-list .offline { border-left: 3px solid var(--status-error); }
 .status-code { display: inline-block; margin-left: 0.5rem; padding: 0.1rem 0.45rem; background: var(--bg-sunken); color: var(--text-secondary); border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 600; }
+.reliability-badge { display: inline-block; margin-left: 0.5rem; padding: 0.1rem 0.45rem; background: var(--accent-soft); color: var(--status-success); border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 600; }
 .results-note { padding: 0.7rem; text-align: center; font-size: 0.78rem; color: var(--text-muted); border-top: 1px solid var(--line); }
 
 .results-list::-webkit-scrollbar { width: 8px; }

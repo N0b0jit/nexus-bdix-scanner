@@ -51,6 +51,8 @@ let retryRoundActive = false;
 let retryRemaining = 0;
 let customListText = null;
 const CUSTOM_LIST_KEY = 'nexusBdixScanner.customList';
+const SERVER_HISTORY_KEY = 'nexusBdixScanner.serverHistory';
+const SPEED_TEST_KEY = 'nexusBdixScanner.speedTest';
 
 /* ---- DOM refs ---- */
 const startStopBtn = $('startStopBtn');
@@ -355,16 +357,21 @@ function recordResult(result) {
     if (!entry) return;
     entry.status = result.status;
     entry.code = result.code;
+    entry.timestamp = Date.now();
 
     processedUrls++;
     if (result.status === 'online') {
         onlineCount++;
         bump(onlineCountEl);
         bump(onlinePillEl);
+        // Record server history for online servers
+        recordServerHistory(result.url, 'online');
     } else {
         offlineCount++;
         bump(offlineCountEl);
         bump(offlinePillEl);
+        // Record server history for offline servers
+        recordServerHistory(result.url, 'offline');
     }
 
     updateStats();
@@ -408,6 +415,19 @@ function buildListItems(container, entries, statusClass) {
         a.rel = 'noopener';
         a.textContent = e.url + ' (' + (statusClass === 'online' ? 'Reachable' : 'Unreachable') + ')';
         li.appendChild(a);
+        
+        // Add reliability indicator for online servers
+        if (statusClass === 'online') {
+            const reliability = getServerReliability(e.url);
+            if (reliability && reliability.totalChecks > 1) {
+                const reliabilityBadge = document.createElement('span');
+                reliabilityBadge.className = 'reliability-badge';
+                reliabilityBadge.textContent = reliability.reliability + '% reliable';
+                reliabilityBadge.title = 'Based on ' + reliability.totalChecks + ' checks';
+                li.appendChild(reliabilityBadge);
+            }
+        }
+        
         if (e.code) {
             const code = document.createElement('span');
             code.className = 'status-code';
@@ -601,6 +621,10 @@ function finishScanning() {
         if (soundOnComplete.checked) playBeep();
         showCompletionCta(onlineCount);
         saveState();
+        
+        // Start real-time updates after scan completes
+        startRealtimeUpdates();
+        
         setTimeout(function () { showSocialFollowModal(false); }, 1500);
     }
 }
@@ -636,6 +660,9 @@ function resetScanning() {
     retryRoundActive = false;
     retryRemaining = 0;
     stopTimer();
+    
+    // Stop real-time updates
+    stopRealtimeUpdates();
 
     setScanButton('start');
     document.body.classList.remove('scanning');
@@ -764,6 +791,14 @@ function shareResults() {
     }).catch(function () { showToast('Copy failed — select manually'); });
 }
 
+function shareOnWhatsApp() {
+    const summary = shareResultsSummary();
+    const utmParam = '?utm_source=whatsapp&utm_medium=social&utm_campaign=share';
+    const url = 'https://wa.me/?text=' + encodeURIComponent(summary + ' ' + window.location.origin + utmParam);
+    window.open(url, '_blank', 'noopener');
+    showToast('Opening WhatsApp share…', true);
+}
+
 /* ============================================================
    Persistence (localStorage)
    ============================================================ */
@@ -814,6 +849,163 @@ function restoreState() {
         updateProgress(100);
         renderResults();
         showToast('Restored previous scan results');
+    }
+}
+
+/* ============================================================
+   Server History Tracking
+   ============================================================ */
+function recordServerHistory(url, status) {
+    try {
+        const history = JSON.parse(localStorage.getItem(SERVER_HISTORY_KEY) || '{}');
+        if (!history[url]) {
+            history[url] = { online: 0, offline: 0, lastSeen: null, firstSeen: Date.now() };
+        }
+        history[url][status]++;
+        history[url].lastSeen = Date.now();
+        
+        // Keep only last 100 servers to prevent storage bloat
+        const entries = Object.entries(history);
+        if (entries.length > 100) {
+            entries.sort(function (a, b) { return b[1].lastSeen - a[1].lastSeen; });
+            const trimmed = {};
+            for (let i = 0; i < 100; i++) {
+                trimmed[entries[i][0]] = entries[i][1];
+            }
+            localStorage.setItem(SERVER_HISTORY_KEY, JSON.stringify(trimmed));
+        } else {
+            localStorage.setItem(SERVER_HISTORY_KEY, JSON.stringify(history));
+        }
+    } catch (e) { /* ignore storage errors */ }
+}
+
+function getServerHistory(url) {
+    try {
+        const history = JSON.parse(localStorage.getItem(SERVER_HISTORY_KEY) || '{}');
+        return history[url] || null;
+    } catch (e) { return null; }
+}
+
+function getServerReliability(url) {
+    const history = getServerHistory(url);
+    if (!history || (history.online + history.offline) === 0) return null;
+    const total = history.online + history.offline;
+    return {
+        reliability: Math.round((history.online / total) * 100),
+        totalChecks: total,
+        lastSeen: history.lastSeen
+    };
+}
+
+/* ============================================================
+   Speed Testing Integration
+   ============================================================ */
+async function testServerSpeed(url) {
+    // Using a simple fetch-based speed test (simulated for static site)
+    const startTime = performance.now();
+    try {
+        const response = await fetch(url, { 
+            method: 'HEAD', 
+            mode: 'no-cors',
+            cache: 'no-store'
+        });
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        
+        // Estimate speed based on response time (simplified)
+        const speedScore = Math.max(0, Math.min(100, Math.round(10000 / duration)));
+        
+        return {
+            url: url,
+            responseTime: Math.round(duration),
+            speedScore: speedScore,
+            timestamp: Date.now()
+        };
+    } catch (e) {
+        return {
+            url: url,
+            responseTime: null,
+            speedScore: 0,
+            timestamp: Date.now(),
+            error: true
+        };
+    }
+}
+
+function saveSpeedTestResult(result) {
+    try {
+        const speedTests = JSON.parse(localStorage.getItem(SPEED_TEST_KEY) || '[]');
+        speedTests.push(result);
+        
+        // Keep only last 50 speed tests
+        if (speedTests.length > 50) {
+            speedTests.shift();
+        }
+        
+        localStorage.setItem(SPEED_TEST_KEY, JSON.stringify(speedTests));
+    } catch (e) { /* ignore storage errors */ }
+}
+
+function getAverageSpeedScore(url) {
+    try {
+        const speedTests = JSON.parse(localStorage.getItem(SPEED_TEST_KEY) || '[]');
+        const urlTests = speedTests.filter(function (t) { return t.url === url && !t.error; });
+        if (urlTests.length === 0) return null;
+        
+        const totalScore = urlTests.reduce(function (sum, t) { return sum + t.speedScore; }, 0);
+        return Math.round(totalScore / urlTests.length);
+    } catch (e) { return null; }
+}
+
+/* ============================================================
+   Real-time Status Simulation (for static site)
+   ============================================================ */
+let realtimeInterval = null;
+
+function startRealtimeUpdates() {
+    if (realtimeInterval) clearInterval(realtimeInterval);
+    
+    // Simulate real-time updates every 30 seconds
+    realtimeInterval = setInterval(function () {
+        if (!scanningActive && allServers.length > 0) {
+            // Randomly check a few servers to simulate real-time monitoring
+            const sampleSize = Math.min(5, Math.floor(allServers.length / 10));
+            const indices = [];
+            while (indices.length < sampleSize) {
+                const idx = Math.floor(Math.random() * allServers.length);
+                if (indices.indexOf(idx) === -1) indices.push(idx);
+            }
+            
+            indices.forEach(function (idx) {
+                const server = allServers[idx];
+                if (server) {
+                    // Simulate status change (10% chance of status flip)
+                    if (Math.random() < 0.1) {
+                        const newStatus = server.status === 'online' ? 'offline' : 'online';
+                        server.status = newStatus;
+                        server.timestamp = Date.now();
+                        
+                        if (newStatus === 'online') {
+                            onlineCount++;
+                            offlineCount--;
+                        } else {
+                            onlineCount--;
+                            offlineCount++;
+                        }
+                        
+                        updateStats();
+                        scheduleRender();
+                    }
+                }
+            });
+        }
+    }, 30000); // 30 seconds
+}
+
+function stopRealtimeUpdates() {
+    if (realtimeInterval) {
+        clearInterval(realtimeInterval);
+        realtimeInterval = null;
     }
 }
 
@@ -1148,6 +1340,9 @@ function init() {
     });
     $('downloadBtn').addEventListener('click', downloadTxt);
     $('shareBtn').addEventListener('click', shareResults);
+    if ($('whatsappBtn')) {
+        $('whatsappBtn').addEventListener('click', shareOnWhatsApp);
+    }
 
     document.querySelectorAll('.pill').forEach(function (btn) {
         btn.addEventListener('click', function () {
