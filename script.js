@@ -20,6 +20,8 @@ const GITHUB_ISSUE_URL = 'https://github.com/' + GITHUB_REPO + '/issues/new';
 
 const TELEGRAM_PROMO = 'https://t.me/n0b0jit_nexus';
 const LINKTREE_PROMO = 'https://linktr.ee/mr_nobojit.m';
+const SHARE_UTM = '?utm_source=bdixradar&utm_medium=referral&utm_campaign=completion';
+const SHARE_BASE_URL = 'https://nexus-bdix-scanner.onrender.com/';
 
 /* ---- Social / YouTube showcase config ----
    Leave SOCIAL_YOUTUBE_CHANNEL_ID empty ('') to disable the YouTube
@@ -781,7 +783,8 @@ function downloadTxt() {
 
 function shareResultsSummary() {
     return 'BDIX Radar — I found ' + onlineCount + ' reachable / ' + offlineCount +
-        ' unreachable (of ' + totalUrls + '). Scan yours: ' + TELEGRAM_PROMO + ' | ' + LINKTREE_PROMO;
+        ' unreachable (of ' + totalUrls + '). Scan yours: ' + SHARE_BASE_URL + SHARE_UTM +
+        ' | TG: ' + TELEGRAM_PROMO + ' | ' + LINKTREE_PROMO;
 }
 
 function shareResults() {
@@ -793,8 +796,7 @@ function shareResults() {
 
 function shareOnWhatsApp() {
     const summary = shareResultsSummary();
-    const utmParam = '?utm_source=whatsapp&utm_medium=social&utm_campaign=share';
-    const url = 'https://wa.me/?text=' + encodeURIComponent(summary + ' ' + window.location.origin + utmParam);
+    const url = 'https://wa.me/?text=' + encodeURIComponent(summary);
     window.open(url, '_blank', 'noopener');
     showToast('Opening WhatsApp share…', true);
 }
@@ -1070,7 +1072,7 @@ function loadVisitors() {
 function showCompletionCta(reachCount) {
     if (!completionCta) return;
     const msg = 'Hey! I just scanned BDIX servers with BDIX Radar — found ' +
-        reachCount + ' reachable. Send me the latest list?';
+        reachCount + ' reachable. Check it out: ' + SHARE_BASE_URL + SHARE_UTM;
     telegramCtaBtn.href = TELEGRAM_PROMO + '?text=' + encodeURIComponent(msg);
     completionCta.hidden = false;
     completionCta.classList.add('show');
@@ -1135,6 +1137,10 @@ function drawShareCard() {
     ctx.fillText('@n0b0jit_nexus', panelX + 48, panelY + 440);
     ctx.fillStyle = '#10b981';
     ctx.fillText('linktr.ee/mr_nobojit.m', panelX + 48, panelY + 496);
+
+    ctx.fillStyle = '#7f8db0';
+    ctx.font = '500 30px "JetBrains Mono", monospace';
+    ctx.fillText('nexus-bdix-scanner.onrender.com', panelX + 48, panelY + 552);
 
     return c;
 }

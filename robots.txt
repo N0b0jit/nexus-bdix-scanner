@@ -1,4 +1,17 @@
+# BDIX Radar - robots.txt
+# Allow all search engines to crawl the site
+
 User-agent: *
 Allow: /
+Disallow: /node_modules/
+Disallow: /test-bdix.js
+Disallow: /.vercel/
 
-Sitemap: https://nexus-bdix-scanner.netlify.app/sitemap.xml
+# Crawl-delay to prevent overloading the server
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://nexus-bdix-scanner.onrender.com/sitemap.xml
+
+# Additional sitemaps for better indexing
+Sitemap: https://nexus-bdix-scanner.onrender.com/sitemap-index.xml
