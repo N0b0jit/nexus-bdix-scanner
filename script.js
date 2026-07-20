@@ -1,7 +1,7 @@
 'use strict';
 
 /* ============================================================
-   Nexus BDIX Scanner — parallel, static-only, vanilla JS
+   BDIX Radar — parallel, static-only, vanilla JS scanner
    ============================================================ */
 
 const SERVER_LIST_URL = 'all_servers.txt';
@@ -10,140 +10,53 @@ const VISITORS_API = 'https://api.countapi.xyz/hit/nexus-bdix-scanner/visits';
 const RENDER_LIMIT = 300;
 
 /* ---- Feature 17: Web Push (serverless) ----
-   PLACEHOLDER: Replace with your real VAPID public key (urlsafe base64, no padding)
-   generated with `npm i -g web-push` then `web-push generate-vapid-keys`. */
+   PLACEHOLDER: Replace with your real VAPID public key (urlsafe base64, no padding). */
 const VAPID_PUBLIC_KEY = 'PLACEHOLDER_VAPID_PUBLIC_KEY_REPLACE_ME';
-/* PLACEHOLDER: Serverless subscribe endpoint (Netlify/Vercel). See api/subscribe.js. */
 const SUBSCRIBE_ENDPOINT = '/api/subscribe';
 
-/* ---- Feature 10: GitHub repo preset for "Submit a server" issue URLs ---- */
-const GITHUB_REPO = 'n0b0jit/nexus-bdix-scanner'; // OWNER/REPO — adjust to your repo
+/* ---- Feature 10: GitHub repo preset for "Submit a server" ---- */
+const GITHUB_REPO = 'n0b0jit/nexus-bdix-scanner';
 const GITHUB_ISSUE_URL = 'https://github.com/' + GITHUB_REPO + '/issues/new';
 
 const TELEGRAM_PROMO = 'https://t.me/n0b0jit_nexus';
 const LINKTREE_PROMO = 'https://linktr.ee/mr_nobojit.m';
 
+/* ---- Social / YouTube showcase config ----
+   Leave SOCIAL_YOUTUBE_CHANNEL_ID empty ('') to disable the YouTube
+   showcase + scan popup gracefully (no console errors). */
+const SOCIAL_YOUTUBE_CHANNEL_ID = '';
+const SOCIAL_POPUP_AUTO_SHOW = false;
+const SOCIAL_MANUAL_URL = '';
+
+const $ = function (id) { return document.getElementById(id); };
+
 /* ============================================================
-   Social popup while scanning
+   State
    ============================================================ */
-const socialPopup = $('socialPopup');
-const socialPopupFrame = $('socialPopupFrame');
-const socialPopupLink = $('socialPopupLink');
-const socialPopupClose = $('socialPopupClose');
-const socialPopupTitle = $('socialPopupTitle');
-
-function maybeShowSocialPopup() {
-    if (!SOCIAL_POPUP_AUTO_SHOW || !socialPopup) return;
-    if (SOCIAL_MANUAL_URL) {
-        showSocialPopup(null);
-        return;
-    }
-    fetchLatestYouTubeVideoId(SOCIAL_YOUTUBE_CHANNEL_ID).then(function (id) {
-        if (id) showSocialPopup(id);
-        else showSocialPopupFallback();
-    });
-}
-
-function showSocialPopup(videoId) {
-    if (!socialPopup) return;
-    const target = SOCIAL_MANUAL_URL || (videoId ? 'https://www.youtube.com/embed/' + videoId : '');
-    if (!target) { socialPopup.hidden = true; return; }
-    if (socialPopupTitle) socialPopupTitle.textContent = '🎬 Latest upload';
-    if (socialPopupLink) {
-        socialPopupLink.href = SOCIAL_MANUAL_URL || ('https://www.youtube.com/watch?v=' + videoId);
-        socialPopupLink.textContent = 'Watch on YouTube';
-        socialPopupLink.hidden = !SOCIAL_MANUAL_URL && !videoId;
-    }
-    if (socialPopupFrame) {
-        socialPopupFrame.src = target;
-        socialPopupFrame.hidden = !target;
-    }
-    socialPopup.hidden = false;
-}
-
-function hideSocialPopup() {
-    if (!socialPopup) return;
-    socialPopup.hidden = true;
-    if (socialPopupFrame) socialPopupFrame.src = '';
-}
-
-function showSocialPopupFallback() {
-    if (!socialPopup) return;
-    const channelUrl = 'https://www.youtube.com/channel/' + SOCIAL_YOUTUBE_CHANNEL_ID;
-    if (socialPopupTitle) socialPopupTitle.textContent = '🎬 Check out my channel';
-    if (socialPopupFrame) { socialPopupFrame.hidden = true; socialPopupFrame.src = ''; }
-    if (socialPopupLink) {
-        socialPopupLink.href = channelUrl;
-        socialPopupLink.textContent = 'Open YouTube channel';
-        socialPopupLink.hidden = false;
-    }
-    socialPopup.hidden = false;
-}
-
-function getYouTubeRssUrl(channel) {
-    return 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channel;
-}
-
-function fetchLatestYouTubeVideoId(channelId) {
-    const directUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
-    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
-    const doFetch = function (url) {
-        return fetch(url)
-            .then(function (r) { return r.text(); })
-            .then(function (xml) {
-                const m = xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
-                return m ? m[1] : null;
-            });
-    };
-    return doFetch(directUrl).catch(function () {
-        return doFetch(proxyUrl);
-    }).catch(function () {
-        return null;
-    });
-}
-
-function fetchLatestYouTubeTitle(channelId) {
-    const directUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
-    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
-    const doFetch = function (url) {
-        return fetch(url)
-            .then(function (r) { return r.text(); })
-            .then(function (xml) {
-                const m = xml.match(/<title>([^<]+)<\/title>/);
-                return m ? m[1] : null;
-            });
-    };
-    return doFetch(directUrl).catch(function () {
-        return doFetch(proxyUrl);
-    }).catch(function () {
-        return null;
-    });
-}
-
-/* ---- State ---- */
-let allServers = [];          // [{ url, status: 'online'|'offline', code }]
-let queueIndex = 0;           // next URL to dispatch from allServers
+let allServers = [];
+let queueIndex = 0;
 let totalUrls = 0;
 let processedUrls = 0;
 let onlineCount = 0;
 let offlineCount = 0;
 let scanningActive = false;
 let scanningPaused = false;
+let scanFinished = false;
 let startTime = 0;
 let elapsedTime = 0;
 let timerInterval = null;
 let activeWorkers = 0;
-let scanTimeoutMult = 1;      /* multiplied into per-request timeout for retry passes */
-let retryRoundActive = false; /* true while auto-retrying unreachable servers */
-let retryRemaining = 0;       /* number of retry passes left to run */
-let customListText = null;    /* raw text of user-loaded server list */
+let scanTimeoutMult = 1;
+let retryRoundActive = false;
+let retryRemaining = 0;
+let customListText = null;
 const CUSTOM_LIST_KEY = 'nexusBdixScanner.customList';
 
-/* ---- DOM ---- */
-const $ = function (id) { return document.getElementById(id); };
+/* ---- DOM refs ---- */
 const startStopBtn = $('startStopBtn');
 const resetBtn = $('resetBtn');
 const progressBar = $('progressBar');
+const progressBarTrack = $('progressBarTrack');
 const progressPercent = $('progressPercent');
 const progressRing = $('progressRing');
 const ringPercent = $('ringPercent');
@@ -159,6 +72,8 @@ const currentUrlContainer = $('currentUrlContainer');
 const currentUrlEl = $('currentUrl');
 const urlList = $('urlList');
 const urlList2 = $('urlList2');
+const emptyOnline = $('emptyOnline');
+const emptyOffline = $('emptyOffline');
 const toastEl = $('toast');
 const searchInput = $('searchInput');
 const renderNoteOnline = $('renderNoteOnline');
@@ -189,8 +104,107 @@ const cardHint = $('cardHint');
 const updateBanner = $('updateBanner');
 const reloadBtn = $('reloadBtn');
 const dismissUpdateBtn = $('dismissUpdateBtn');
+const socialFollowModal = $('socialFollowModal');
+const youtubeShowcase = $('youtubeShowcase');
+const ytThumb = $('ytThumb');
+const ytTitle = $('ytTitle');
+const ytCard = $('ytCard');
 
-/* ---- Presets / config read helpers ---- */
+const socialPopup = $('socialPopup');
+const socialPopupFrame = $('socialPopupFrame');
+const socialPopupLink = $('socialPopupLink');
+const socialPopupClose = $('socialPopupClose');
+const socialPopupTitle = $('socialPopupTitle');
+
+let serverListCache = null;
+
+/* ============================================================
+   Social popup while scanning
+   ============================================================ */
+function maybeShowSocialPopup() {
+    if (!SOCIAL_POPUP_AUTO_SHOW || !socialPopup) return;
+    if (SOCIAL_MANUAL_URL) { showSocialPopup(null); return; }
+    if (!SOCIAL_YOUTUBE_CHANNEL_ID) return;
+    fetchLatestYouTubeVideoId(SOCIAL_YOUTUBE_CHANNEL_ID).then(function (id) {
+        if (id) showSocialPopup(id);
+        else showSocialPopupFallback();
+    });
+}
+
+function showSocialPopup(videoId) {
+    if (!socialPopup) return;
+    const target = SOCIAL_MANUAL_URL || (videoId ? 'https://www.youtube.com/embed/' + videoId : '');
+    if (!target) { hideSocialPopup(); return; }
+    if (socialPopupTitle) socialPopupTitle.textContent = '🎬 Latest upload';
+    if (socialPopupLink) {
+        socialPopupLink.href = SOCIAL_MANUAL_URL || ('https://www.youtube.com/watch?v=' + videoId);
+        socialPopupLink.textContent = 'Watch on YouTube';
+        socialPopupLink.hidden = !SOCIAL_MANUAL_URL && !videoId;
+    }
+    if (socialPopupFrame) {
+        socialPopupFrame.src = target;
+        socialPopupFrame.hidden = !target;
+    }
+    socialPopup.hidden = false;
+}
+
+function hideSocialPopup() {
+    if (!socialPopup) return;
+    socialPopup.hidden = true;
+    if (socialPopupFrame) socialPopupFrame.src = '';
+}
+
+function showSocialPopupFallback() {
+    if (!socialPopup || !SOCIAL_YOUTUBE_CHANNEL_ID) return;
+    const channelUrl = 'https://www.youtube.com/channel/' + SOCIAL_YOUTUBE_CHANNEL_ID;
+    if (socialPopupTitle) socialPopupTitle.textContent = '🎬 Check out my channel';
+    if (socialPopupFrame) { socialPopupFrame.hidden = true; socialPopupFrame.src = ''; }
+    if (socialPopupLink) {
+        socialPopupLink.href = channelUrl;
+        socialPopupLink.textContent = 'Open YouTube channel';
+        socialPopupLink.hidden = false;
+    }
+    socialPopup.hidden = false;
+}
+
+function fetchLatestYouTubeVideoId(channelId) {
+    const directUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
+    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
+    const doFetch = function (url) {
+        return fetch(url).then(function (r) { return r.text(); }).then(function (xml) {
+            const m = xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+            return m ? m[1] : null;
+        });
+    };
+    return doFetch(directUrl).catch(function () { return doFetch(proxyUrl); }).catch(function () { return null; });
+}
+
+function setupYouTubeShowcase() {
+    if (!youtubeShowcase || !ytThumb || !ytTitle || !ytCard) return;
+    if (!SOCIAL_YOUTUBE_CHANNEL_ID) return;
+    const channelId = SOCIAL_YOUTUBE_CHANNEL_ID;
+    const directUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
+    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
+    const doFetch = function (url) {
+        return fetch(url).then(function (r) { return r.text(); }).then(function (xml) {
+            const videoIdMatch = xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+            const titleMatch = xml.match(/<title>([^<]+)<\/title>/);
+            return { videoId: videoIdMatch ? videoIdMatch[1] : null, title: titleMatch ? titleMatch[1] : null };
+        });
+    };
+    doFetch(directUrl).catch(function () { return doFetch(proxyUrl); }).catch(function () { return null; })
+        .then(function (data) {
+            if (!data || !data.videoId) return;
+            ytThumb.src = 'https://img.youtube.com/vi/' + data.videoId + '/mqdefault.jpg';
+            ytCard.href = 'https://www.youtube.com/watch?v=' + data.videoId;
+            youtubeShowcase.hidden = false;
+            if (data.title) ytTitle.textContent = data.title;
+        });
+}
+
+/* ============================================================
+   Config read helpers
+   ============================================================ */
 function getTimeoutMs() {
     const v = parseInt(timeOutValue.value, 10);
     return Math.round((isNaN(v) || v < 1 ? 8 : v) * 1000 * scanTimeoutMult);
@@ -207,7 +221,7 @@ let toastTimer = null;
 function showToast(message, win) {
     if (!toastEl) return;
     toastEl.textContent = message;
-    toastEl.classList.toggle('win', !!win);
+    toastEl.classList.toggle('success', !!win);
     toastEl.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 3200);
@@ -237,17 +251,17 @@ progressRing.style.strokeDasharray = RING_CIRCUMFERENCE;
 function updateProgress(percent) {
     percent = Math.max(0, Math.min(100, percent));
     progressBar.style.width = percent + '%';
-    progressBar.setAttribute('aria-valuenow', percent);
+    if (progressBarTrack) progressBarTrack.setAttribute('aria-valuenow', percent);
     progressPercent.textContent = percent + '%';
     ringPercent.textContent = percent + '%';
     const offset = RING_CIRCUMFERENCE * (1 - percent / 100);
     progressRing.style.strokeDashoffset = offset;
-    document.title = percent + '% - Scanning BDIX Servers';
+    if (scanningActive && !scanningPaused) document.title = percent + '% — Scanning BDIX servers';
     updateEta(percent);
 }
 
 function updateEta(percent) {
-    if (percent <= 0 || !scanningActive) { etaTimeEl.textContent = '--:--:--'; return; }
+    if (percent <= 0 || !scanningActive || totalUrls === 0) { etaTimeEl.textContent = '--:--:--'; return; }
     const remaining = (elapsedTime / percent) * (100 - percent);
     etaTimeEl.textContent = formatTime(remaining);
 }
@@ -268,7 +282,6 @@ function updateStats() {
    ============================================================ */
 function probeUrl(url) {
     const timeOutMs = getTimeoutMs();
-
     return new Promise(function (resolve) {
         const controller = new AbortController();
         const timeoutId = setTimeout(function () { controller.abort(); }, timeOutMs);
@@ -280,24 +293,15 @@ function probeUrl(url) {
 
 /* Optional accurate probe through a free CORS proxy (real HTTP status). */
 function probeWithProxy(url) {
-    const proxies = [
-        'https://api.allorigins.win/raw?url=',
-        'https://corsproxy.io/?url='
-    ];
+    const proxies = ['https://api.allorigins.win/raw?url=', 'https://corsproxy.io/?url='];
     return (function attempt(i) {
         if (i >= proxies.length) return Promise.resolve(null);
         const target = proxies[i] + encodeURIComponent(url);
         const controller = new AbortController();
         const tid = setTimeout(function () { controller.abort(); }, getTimeoutMs());
         return fetch(target, { method: 'GET', signal: controller.signal })
-            .then(function (res) {
-                clearTimeout(tid);
-                return res.status;
-            })
-            .catch(function () {
-                clearTimeout(tid);
-                return attempt(i + 1);
-            });
+            .then(function (res) { clearTimeout(tid); return res.status; })
+            .catch(function () { clearTimeout(tid); return attempt(i + 1); });
     })(0);
 }
 
@@ -316,8 +320,8 @@ function dispatchWorkers() {
             updateActive();
             if (scanningActive && !scanningPaused) dispatchWorkers();
             else if (scanningActive && scanningPaused && activeWorkers === 0) {
-                /* paused, in-flight done — nothing else to do until resume */
-            } else if (queueIndex >= allServers.length && activeWorkers === 0) {
+                /* paused, in-flight done — wait for resume */
+            } else if (!scanningActive && queueIndex >= allServers.length && activeWorkers === 0) {
                 finishScanning();
             }
         });
@@ -333,12 +337,11 @@ function updateActive() {
 
 function worker(entry) {
     currentUrlEl.textContent = 'Scanning: ' + entry.url;
-    const task = accurateProbe.checked ? probeUrl(entry.url).then(function (r) {
-        return probeWithProxy(entry.url).then(function (code) {
-            r.code = code;
-            return r;
-        });
-    }) : probeUrl(entry.url);
+    const task = accurateProbe.checked
+        ? probeUrl(entry.url).then(function (r) {
+            return probeWithProxy(entry.url).then(function (code) { r.code = code; return r; });
+        })
+        : probeUrl(entry.url);
 
     return task.then(function (result) {
         recordResult(result);
@@ -365,7 +368,7 @@ function recordResult(result) {
     }
 
     updateStats();
-    updateProgress(Math.round((processedUrls / totalUrls) * 100));
+    updateProgress(totalUrls > 0 ? Math.round((processedUrls / totalUrls) * 100) : 0);
     scheduleRender();
     maybeAutoscroll();
 
@@ -426,6 +429,8 @@ function renderResults() {
     renderNoteOffline.textContent = filtered.offline.length > RENDER_LIMIT
         ? 'Showing ' + RENDER_LIMIT + ' of ' + filtered.offline.length + ' — search to refine'
         : '';
+    if (emptyOnline) emptyOnline.hidden = filtered.online.length !== 0 || allServers.length === 0;
+    if (emptyOffline) emptyOffline.hidden = filtered.offline.length !== 0 || allServers.length === 0;
 }
 
 let renderScheduled = false;
@@ -463,6 +468,7 @@ function startScanning() {
    (e.g. the retry pass over only unreachable servers); otherwise the
    full server list is loaded (from cache or network). */
 function beginScan(presetEntries) {
+    scanFinished = false;
     scanningActive = true;
     scanningPaused = false;
     processedUrls = 0;
@@ -479,13 +485,14 @@ function beginScan(presetEntries) {
         urlList2.textContent = '';
         renderNoteOnline.textContent = '';
         renderNoteOffline.textContent = '';
+        if (emptyOnline) emptyOnline.hidden = true;
+        if (emptyOffline) emptyOffline.hidden = true;
     }
     updateStats();
     updateProgress(0);
     startTimer();
 
-    startStopBtn.textContent = 'Stop Scan';
-    startStopBtn.classList.add('scanning');
+    setScanButton('stop');
     document.body.classList.add('scanning');
     showToast(retryRoundActive ? 'Retrying unreachable servers…' : 'Scan started — probing servers in parallel…');
     maybeShowSocialPopup();
@@ -493,7 +500,7 @@ function beginScan(presetEntries) {
     const startWithEntries = function (entries) {
         allServers = entries;
         totalUrls = allServers.length;
-        currentUrlContainer.style.display = 'block';
+        currentUrlContainer.hidden = false;
         dispatchWorkers();
     };
 
@@ -524,10 +531,26 @@ function parseList(text) {
         .map(function (u) { return { url: u, status: null, code: null }; });
 }
 
+function setScanButton(mode) {
+    if (!startStopBtn) return;
+    const iconPlay = '<svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+    const iconStop = '<svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>';
+    const iconResume = '<svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+    if (mode === 'stop') {
+        startStopBtn.innerHTML = iconStop + '<span class="btn-label">Stop Scan</span>';
+        startStopBtn.classList.add('scanning');
+    } else if (mode === 'resume') {
+        startStopBtn.innerHTML = iconResume + '<span class="btn-label">Resume Scan</span>';
+        startStopBtn.classList.remove('scanning');
+    } else {
+        startStopBtn.innerHTML = iconPlay + '<span class="btn-label">Start Scan</span>';
+        startStopBtn.classList.remove('scanning');
+    }
+}
+
 function resumeScanning() {
     scanningPaused = false;
-    startStopBtn.textContent = 'Stop Scan';
-    startStopBtn.classList.add('scanning');
+    setScanButton('stop');
     startTimer();
     document.body.classList.add('scanning');
     showToast('Scan resumed');
@@ -536,14 +559,11 @@ function resumeScanning() {
 
 function pauseScanning() {
     scanningPaused = true;
-    startStopBtn.textContent = 'Resume Scan';
-    startStopBtn.classList.remove('scanning');
+    setScanButton('resume');
     stopTimer();
     document.body.classList.remove('scanning');
     showToast('Scan paused — in-flight requests finishing');
 }
-
-let scanFinished = false;
 
 function finishScanning() {
     if (scanFinished) return;
@@ -551,36 +571,32 @@ function finishScanning() {
     scanFinished = true;
     scanningActive = false;
     scanningPaused = false;
-    startStopBtn.textContent = 'Start Scan';
-    startStopBtn.classList.remove('scanning');
+    setScanButton('start');
     document.body.classList.remove('scanning');
     stopTimer();
     etaTimeEl.textContent = '--:--:--';
+    document.title = 'BDIX Radar';
 
     if (totalUrls > 0 && processedUrls >= totalUrls) {
-        document.title = 'BDIX Scanner - Complete';
         const unreachable = allServers.filter(function (e) { return e.status === 'offline'; });
+
         if (retryUnreachable.checked && !retryRoundActive && unreachable.length > 0) {
             retryRemaining = Math.max(1, Math.min(5, parseInt(retryAttempts.value, 10) || 2));
-            scanFinished = false;
-            scanningActive = true;
-            showToast('Scan complete · ' + onlineCount + ' reachable. Retrying ' + unreachable.length + ' unreachable (' + retryRemaining + ' passes)…', true);
-            if (soundOnComplete.checked) playBeep();
-            showCompletionCta(onlineCount);
-            saveState();
             startRetryRound();
             return;
         }
+
         if (retryRoundActive && retryRemaining > 0) {
-            scanFinished = false;
-            scanningActive = true;
             startRetryRound();
             return;
         }
+
         if (retryRoundActive) {
             retryRoundActive = false;
             scanTimeoutMult = 1;
         }
+
+        document.title = 'BDIX Radar — Complete';
         showToast('Scan complete · ' + onlineCount + ' reachable, ' + offlineCount + ' unreachable', true);
         if (soundOnComplete.checked) playBeep();
         showCompletionCta(onlineCount);
@@ -590,8 +606,7 @@ function finishScanning() {
 }
 
 /* Retry passes: re-probe only the servers that were unreachable,
-   with an increasing timeout (exponential-ish backoff) each pass to
-   catch slow-responding hosts. Runs up to retryRemaining times. */
+   with an increasing timeout (exponential-ish backoff) each pass. */
 function startRetryRound() {
     retryRoundActive = true;
     const totalPasses = retryRemaining || 1;
@@ -601,6 +616,7 @@ function startRetryRound() {
     const unreachable = allServers
         .filter(function (e) { return e.status === 'offline'; })
         .map(function (e) { return { url: e.url, status: null, code: null }; });
+    showToast('Retrying ' + unreachable.length + ' unreachable (' + (passNo) + '/' + totalPasses + ')…');
     if (unreachable.length === 0) {
         retryRoundActive = false;
         scanTimeoutMult = 1;
@@ -612,6 +628,7 @@ function startRetryRound() {
 function resetScanning() {
     scanningActive = false;
     scanningPaused = false;
+    scanFinished = false;
     activeWorkers = 0;
     updateActive();
     queueIndex = 0;
@@ -620,8 +637,7 @@ function resetScanning() {
     retryRemaining = 0;
     stopTimer();
 
-    startStopBtn.textContent = 'Start Scan';
-    startStopBtn.classList.remove('scanning');
+    setScanButton('start');
     document.body.classList.remove('scanning');
 
     elapsedTime = 0;
@@ -635,14 +651,16 @@ function resetScanning() {
     updateStats();
     elapsedTimeEl.textContent = '00:00:00';
     etaTimeEl.textContent = '--:--:--';
-    document.title = 'BDIX Scanner';
+    document.title = 'BDIX Radar';
 
     urlList.textContent = '';
     urlList2.textContent = '';
     renderNoteOnline.textContent = '';
     renderNoteOffline.textContent = '';
     currentUrlEl.textContent = '';
-    currentUrlContainer.style.display = 'none';
+    currentUrlContainer.hidden = true;
+    if (emptyOnline) emptyOnline.hidden = true;
+    if (emptyOffline) emptyOffline.hidden = true;
     searchInput.value = '';
     hideCompletionCta();
     hideSocialPopup();
@@ -659,7 +677,7 @@ function startTimer() {
     timerInterval = setInterval(function () {
         elapsedTime = Date.now() - startTime;
         elapsedTimeEl.textContent = formatTime(elapsedTime);
-        if (scanningActive) updateEta(Math.round((processedUrls / totalUrls) * 100));
+        if (scanningActive) updateEta(totalUrls > 0 ? Math.round((processedUrls / totalUrls) * 100) : 0);
     }, 100);
 }
 
@@ -726,7 +744,7 @@ function downloadTxt() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'nexus-bdix-results.txt';
+    a.download = 'bdix-radar-results.txt';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -735,7 +753,7 @@ function downloadTxt() {
 }
 
 function shareResultsSummary() {
-    return 'Nexus BDIX Scanner — I found ' + onlineCount + ' reachable / ' + offlineCount +
+    return 'BDIX Radar — I found ' + onlineCount + ' reachable / ' + offlineCount +
         ' unreachable (of ' + totalUrls + '). Scan yours: ' + TELEGRAM_PROMO + ' | ' + LINKTREE_PROMO;
 }
 
@@ -770,9 +788,38 @@ function clearSavedState() {
     updateCustomListUI();
 }
 
+function restoreState() {
+    let data;
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        data = JSON.parse(raw);
+    } catch (e) { return; }
+
+    if (data.timeout) timeOutValue.value = data.timeout;
+    if (data.concurrency) concurrencyValue.value = data.concurrency;
+    if (typeof data.autoscroll === 'boolean') autoscroll.checked = data.autoscroll;
+    if (typeof data.accurateProbe === 'boolean') accurateProbe.checked = data.accurateProbe;
+    if (typeof data.retryUnreachable === 'boolean') retryUnreachable.checked = data.retryUnreachable;
+    if (typeof data.soundOnComplete === 'boolean') soundOnComplete.checked = data.soundOnComplete;
+
+    if (Array.isArray(data.results) && data.results.length) {
+        allServers = data.results;
+        totalUrls = allServers.length;
+        onlineCount = allServers.filter(function (e) { return e.status === 'online'; }).length;
+        offlineCount = allServers.filter(function (e) { return e.status === 'offline'; }).length;
+        processedUrls = allServers.length;
+        scanFinished = true;
+        updateStats();
+        updateProgress(100);
+        renderResults();
+        showToast('Restored previous scan results');
+    }
+}
+
 /* ============================================================
-    Custom list import
-    ============================================================ */
+   Custom list import
+   ============================================================ */
 function loadCustomList(text) {
     customListText = text;
     try { localStorage.setItem(CUSTOM_LIST_KEY, text); } catch (e) {}
@@ -810,40 +857,13 @@ function updateCustomListUI() {
     }
 }
 
-function restoreState() {
-    let data;
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        data = JSON.parse(raw);
-    } catch (e) { return; }
-
-    if (data.timeout) timeOutValue.value = data.timeout;
-    if (data.concurrency) concurrencyValue.value = data.concurrency;
-    if (typeof data.autoscroll === 'boolean') autoscroll.checked = data.autoscroll;
-    if (typeof data.accurateProbe === 'boolean') accurateProbe.checked = data.accurateProbe;
-    if (typeof data.retryUnreachable === 'boolean') retryUnreachable.checked = data.retryUnreachable;
-    if (typeof data.soundOnComplete === 'boolean') soundOnComplete.checked = data.soundOnComplete;
-
-    if (Array.isArray(data.results) && data.results.length) {
-        allServers = data.results;
-        totalUrls = allServers.length;
-        onlineCount = allServers.filter(function (e) { return e.status === 'online'; }).length;
-        offlineCount = allServers.filter(function (e) { return e.status === 'offline'; }).length;
-        processedUrls = allServers.length;
-        updateStats();
-        updateProgress(100);
-        renderResults();
-        showToast('Restored previous scan results');
-    }
-}
-
 /* ============================================================
    Visitors badge (free countapi)
    ============================================================ */
 function loadVisitors() {
     const badge = $('visitorsBadge');
     const countEl = $('visitorsCount');
+    if (!badge || !countEl) return;
     fetch(VISITORS_API).then(function (r) { return r.json(); }).then(function (d) {
         if (d && typeof d.value === 'number') {
             countEl.textContent = d.value.toLocaleString();
@@ -853,21 +873,24 @@ function loadVisitors() {
 }
 
 /* ============================================================
-   Feature 3: Telegram deep-link CTA on completion
+   Telegram deep-link CTA on completion
    ============================================================ */
 function showCompletionCta(reachCount) {
     if (!completionCta) return;
-    const msg = 'Hey! I just scanned BDIX servers with Nexus Scanner — found ' +
+    const msg = 'Hey! I just scanned BDIX servers with BDIX Radar — found ' +
         reachCount + ' reachable. Send me the latest list?';
     telegramCtaBtn.href = TELEGRAM_PROMO + '?text=' + encodeURIComponent(msg);
     completionCta.hidden = false;
+    completionCta.classList.add('show');
 }
 function hideCompletionCta() {
-    if (completionCta) completionCta.hidden = true;
+    if (!completionCta) return;
+    completionCta.hidden = true;
+    completionCta.classList.remove('show');
 }
 
 /* ============================================================
-   Feature 1: Client-side share card (canvas 1200x630)
+   Client-side share card (canvas 1200x630)
    ============================================================ */
 function drawShareCard() {
     const c = shareCanvas;
@@ -875,14 +898,12 @@ function drawShareCard() {
     const ctx = c.getContext('2d');
     const W = c.width, H = c.height;
 
-    /* Background — dark glass gradient */
     const bg = ctx.createLinearGradient(0, 0, W, H);
-    bg.addColorStop(0, '#0a0e22');
-    bg.addColorStop(1, '#060814');
+    bg.addColorStop(0, '#0f1722');
+    bg.addColorStop(1, '#0b1220');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    /* Glow orbs */
     function orb(x, y, r, color) {
         const g = ctx.createRadialGradient(x, y, 0, x, y, r);
         g.addColorStop(0, color);
@@ -890,42 +911,37 @@ function drawShareCard() {
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, W, H);
     }
-    orb(W * 0.12, H * 0.2, 360, 'rgba(139,92,246,0.35)');
-    orb(W * 0.9, H * 0.85, 420, 'rgba(37,224,255,0.30)');
-    orb(W * 0.7, H * 0.15, 300, 'rgba(46,230,166,0.20)');
+    orb(W * 0.12, H * 0.2, 360, 'rgba(16,185,129,0.35)');
+    orb(W * 0.9, H * 0.85, 420, 'rgba(14,165,164,0.30)');
+    orb(W * 0.7, H * 0.15, 300, 'rgba(245,158,11,0.20)');
 
-    /* Glass card panel */
     const pad = 50, panelX = pad, panelY = pad, panelW = W - pad * 2, panelH = H - pad * 2;
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     roundRect(ctx, panelX, panelY, panelW, panelH, 28); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.14)';
     ctx.lineWidth = 2; roundRect(ctx, panelX, panelY, panelW, panelH, 28); ctx.stroke();
 
-    /* Title */
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#eaf2ff';
-    ctx.font = '700 64px "Space Grotesk", sans-serif';
-    ctx.fillText('Nexus BDIX Scanner', panelX + 48, panelY + 48);
+    ctx.font = '700 64px Inter, sans-serif';
+    ctx.fillText('BDIX Radar', panelX + 48, panelY + 48);
 
-    /* Headline with count */
     const grad = ctx.createLinearGradient(panelX + 48, 0, panelX + 48 + 900, 0);
-    grad.addColorStop(0, '#25e0ff');
-    grad.addColorStop(1, '#2ee6a6');
+    grad.addColorStop(0, '#10b981');
+    grad.addColorStop(1, '#0ea5a4');
     ctx.fillStyle = grad;
-    ctx.font = '700 76px "Space Grotesk", sans-serif';
+    ctx.font = '700 76px Inter, sans-serif';
     ctx.fillText('I found ' + onlineCount + ' reachable', panelX + 48, panelY + 150);
     ctx.fillText('BDIX servers', panelX + 48, panelY + 238);
 
-    /* Subline */
     ctx.fillStyle = '#9fb0d0';
     ctx.font = '400 34px "JetBrains Mono", monospace';
     ctx.fillText(offlineCount + ' unreachable · ' + totalUrls + ' scanned', panelX + 48, panelY + 350);
 
-    /* Creator handles */
     ctx.fillStyle = '#eaf2ff';
-    ctx.font = '600 36px "Space Grotesk", sans-serif';
+    ctx.font = '600 36px Inter, sans-serif';
     ctx.fillText('@n0b0jit_nexus', panelX + 48, panelY + 440);
-    ctx.fillStyle = '#8b5cf6';
+    ctx.fillStyle = '#10b981';
     ctx.fillText('linktr.ee/mr_nobojit.m', panelX + 48, panelY + 496);
 
     return c;
@@ -946,6 +962,7 @@ function openCardModal() {
     const c = drawShareCard();
     if (!c) { showToast('Canvas unsupported — using text share'); shareResults(); return; }
     cardModal.hidden = false;
+    cardModal.classList.add('open');
     cardHint.textContent = '';
 }
 
@@ -957,7 +974,7 @@ function downloadCard() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'nexus-bdix-card.png';
+        a.download = 'bdix-radar-card.png';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
         showToast('Card downloaded', true);
@@ -979,7 +996,7 @@ function copyCardImage() {
 }
 
 /* ============================================================
-   Feature 10: Submit a server (GitHub issue / Telegram)
+   Submit a server (GitHub issue / Telegram)
    ============================================================ */
 function handleSubmit(e) {
     e.preventDefault();
@@ -988,7 +1005,7 @@ function handleSubmit(e) {
     const note = (submitNote.value || '').trim();
     const body = '**Server URL:** ' + url + '\n\n' +
         (note ? '**Note:** ' + note + '\n\n' : '') +
-        '_Submitted from Nexus BDIX Scanner._';
+        '_Submitted from BDIX Radar._';
     const issueUrl = GITHUB_ISSUE_URL + '?title=' + encodeURIComponent('Submit server: ' + url) +
         '&body=' + encodeURIComponent(body) + '&labels=' + encodeURIComponent('server-submission');
     const tgMsg = 'New BDIX server to add: ' + url + (note ? ' — ' + note : '');
@@ -1000,7 +1017,7 @@ function handleSubmit(e) {
 }
 
 /* ============================================================
-   Feature 17: Web Push notifications (client side)
+   Web Push notifications (client side)
    ============================================================ */
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -1053,8 +1070,14 @@ async function disableNotifications() {
 }
 
 /* ============================================================
-   Feature 19: PWA update prompt
+   PWA update prompt
    ============================================================ */
+function showUpdateBanner() {
+    if (!updateBanner) return;
+    updateBanner.hidden = false;
+    updateBanner.classList.add('show');
+}
+
 function setupUpdateDetection(reg) {
     if (!reg) return;
     reg.addEventListener('updatefound', function () {
@@ -1062,7 +1085,7 @@ function setupUpdateDetection(reg) {
         if (!installing) return;
         installing.addEventListener('statechange', function () {
             if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-                updateBanner.hidden = false;
+                showUpdateBanner();
             }
         });
     });
@@ -1071,79 +1094,7 @@ function setupUpdateDetection(reg) {
 function setupControllerChange() {
     if (!('serviceWorker' in navigator)) return;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
-        updateBanner.hidden = false;
-    });
-}
-
-/* ============================================================
-   Social popup while scanning
-   ============================================================ */
-function getYouTubeRssUrl(channel) {
-    return 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channel;
-}
-
-function fetchLatestYouTubeVideoId(channelId) {
-    const directUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
-    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
-    const doFetch = function (url) {
-        return fetch(url)
-            .then(function (r) { return r.text(); })
-            .then(function (xml) {
-                const m = xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
-                return m ? m[1] : null;
-            });
-    };
-    return doFetch(directUrl).catch(function () {
-        return doFetch(proxyUrl);
-    }).catch(function () {
-        return null;
-    });
-}
-
-function fetchLatestYouTubeTitle(channelId) {
-    const directUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
-    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
-    const doFetch = function (url) {
-        return fetch(url)
-            .then(function (r) { return r.text(); })
-            .then(function (xml) {
-                const m = xml.match(/<title>([^<]+)<\/title>/);
-                return m ? m[1] : null;
-            });
-    };
-    return doFetch(directUrl).catch(function () {
-        return doFetch(proxyUrl);
-    }).catch(function () {
-        return null;
-    });
-}
-
-function setupYouTubeShowcase() {
-    if (!youtubeShowcase || !ytThumb || !ytTitle || !ytCard) return;
-    const channelId = SOCIAL_YOUTUBE_CHANNEL_ID;
-    if (!channelId) return;
-
-    const directUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
-    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
-    const doFetch = function (url) {
-        return fetch(url)
-            .then(function (r) { return r.text(); })
-            .then(function (xml) {
-                const videoIdMatch = xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
-                const titleMatch = xml.match(/<title>([^<]+)<\/title>/);
-                return { videoId: videoIdMatch ? videoIdMatch[1] : null, title: titleMatch ? titleMatch[1] : null };
-            });
-    };
-    doFetch(directUrl).catch(function () {
-        return doFetch(proxyUrl);
-    }).catch(function () {
-        return null;
-    }).then(function (data) {
-        if (!data || !data.videoId) return;
-        ytThumb.src = 'https://img.youtube.com/vi/' + data.videoId + '/mqdefault.jpg';
-        ytCard.href = 'https://www.youtube.com/watch?v=' + data.videoId;
-        youtubeShowcase.hidden = false;
-        if (data.title) ytTitle.textContent = data.title;
+        showUpdateBanner();
     });
 }
 
@@ -1160,12 +1111,14 @@ function showSocialFollowModal(force) {
         } catch (e) { /* ignore */ }
     }
     socialFollowModal.hidden = false;
+    socialFollowModal.classList.add('open');
     document.body.style.overflow = 'hidden';
 }
 
 function hideSocialFollowModal() {
     if (!socialFollowModal) return;
     socialFollowModal.hidden = true;
+    socialFollowModal.classList.remove('open');
     document.body.style.overflow = '';
     try { localStorage.setItem(SOCIAL_FOLLOW_KEY, '1'); } catch (e) {}
     if (socialFollowHint) socialFollowHint.textContent = '';
@@ -1175,9 +1128,9 @@ function hideSocialFollowModal() {
    Wiring
    ============================================================ */
 document.addEventListener('DOMContentLoaded', function () {
-    startStopBtn.addEventListener('click', toggleScanning);
-    resetBtn.addEventListener('click', resetScanning);
-    searchInput.addEventListener('input', renderResults);
+    if (startStopBtn) startStopBtn.addEventListener('click', toggleScanning);
+    if (resetBtn) resetBtn.addEventListener('click', resetScanning);
+    if (searchInput) searchInput.addEventListener('input', renderResults);
     $('copyOnlineBtn').addEventListener('click', function () {
         copyText(reachableUrls().join('\n')).then(function () { showToast('Reachable URLs copied', true); })
             .catch(function () { showToast('Copy failed'); });
@@ -1211,8 +1164,8 @@ document.addEventListener('DOMContentLoaded', function () {
         else if ((e.key === 'r' || e.key === 'R') && !typing) { resetScanning(); }
         else if (e.key === '/' && !typing) { e.preventDefault(); searchInput.focus(); }
         else if (e.key === 'Escape') {
-            if (cardModal && !cardModal.hidden) { cardModal.hidden = true; }
-            if (socialFollowModal && !socialFollowModal.hidden) { hideSocialFollowModal(); }
+            if (cardModal && !cardModal.hidden) hideCardModal();
+            if (socialFollowModal && !socialFollowModal.hidden) hideSocialFollowModal();
         }
     });
 
@@ -1223,24 +1176,28 @@ document.addEventListener('DOMContentLoaded', function () {
         setupControllerChange();
     }
 
-    shareCardBtn.addEventListener('click', openCardModal);
-    downloadCardBtn.addEventListener('click', downloadCard);
-    copyCardBtn.addEventListener('click', copyCardImage);
-    copyCardTextBtn.addEventListener('click', function () {
+    if (shareCardBtn) {
+        shareCardBtn.addEventListener('click', openCardModal);
+    }
+    if (downloadCardBtn) downloadCardBtn.addEventListener('click', downloadCard);
+    if (copyCardBtn) copyCardBtn.addEventListener('click', copyCardImage);
+    if (copyCardTextBtn) copyCardTextBtn.addEventListener('click', function () {
         copyText(shareResultsSummary()).then(function () { cardHint.textContent = 'Summary copied.'; })
             .catch(function () { cardHint.textContent = 'Copy failed.'; });
     });
-    cardModal.querySelectorAll('[data-close-card]').forEach(function (el) {
-        el.addEventListener('click', function () { cardModal.hidden = true; });
-    });
-
-    if (socialFollowModal) {
-        socialFollowModal.querySelectorAll('[data-close-social]').forEach(function (el) {
-            el.addEventListener('click', function () { hideSocialFollowModal(); });
+    if (cardModal) {
+        cardModal.querySelectorAll('[data-close-card]').forEach(function (el) {
+            el.addEventListener('click', hideCardModal);
         });
     }
 
-    submitForm.addEventListener('submit', handleSubmit);
+    if (socialFollowModal) {
+        socialFollowModal.querySelectorAll('[data-close-social]').forEach(function (el) {
+            el.addEventListener('click', hideSocialFollowModal);
+        });
+    }
+
+    if (submitForm) submitForm.addEventListener('submit', handleSubmit);
 
     if (customListFile) {
         customListFile.addEventListener('change', function () {
@@ -1258,21 +1215,20 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (clearCustomListBtn) {
-        clearCustomListBtn.addEventListener('click', clearCustomList);
-    }
+    if (clearCustomListBtn) clearCustomListBtn.addEventListener('click', clearCustomList);
 
-    notifyToggle.addEventListener('change', function () {
+    if (notifyToggle) notifyToggle.addEventListener('change', function () {
         if (notifyToggle.checked) enableNotifications();
         else disableNotifications();
     });
 
-    reloadBtn.addEventListener('click', function () { window.location.reload(); });
-    dismissUpdateBtn.addEventListener('click', function () { updateBanner.hidden = true; });
+    if (reloadBtn) reloadBtn.addEventListener('click', function () { window.location.reload(); });
+    if (dismissUpdateBtn) dismissUpdateBtn.addEventListener('click', function () {
+        updateBanner.hidden = true;
+        updateBanner.classList.remove('show');
+    });
 
-    if (socialPopupClose) {
-        socialPopupClose.addEventListener('click', function () { hideSocialPopup(); });
-    }
+    if (socialPopupClose) socialPopupClose.addEventListener('click', hideSocialPopup);
 
     loadVisitors();
     restoreState();
@@ -1282,10 +1238,15 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(function () { showSocialFollowModal(false); }, 8000);
 });
 
+function hideCardModal() {
+    if (!cardModal) return;
+    cardModal.hidden = true;
+    cardModal.classList.remove('open');
+}
+
 /* ============================================================
    Idle prefetch of all_servers.txt so scans start instantly
    ============================================================ */
-let serverListCache = null;
 function prefetchServerList() {
     const doFetch = function () {
         fetch(SERVER_LIST_URL, { cache: 'force-cache' })
