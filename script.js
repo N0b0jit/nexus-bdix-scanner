@@ -23,10 +23,102 @@ const GITHUB_ISSUE_URL = 'https://github.com/' + GITHUB_REPO + '/issues/new';
 const TELEGRAM_PROMO = 'https://t.me/n0b0jit_nexus';
 const LINKTREE_PROMO = 'https://linktr.ee/mr_nobojit.m';
 
-/* ---- Social popup while scanning ---- */
-const SOCIAL_YOUTUBE_CHANNEL_ID = 'UCAxg_BK3X8-58KCnVe4rvuQ'; // YouTube channel ID (starts with UC...) for RSS auto-fetch
-const SOCIAL_MANUAL_URL = ''; // Set a direct link (YouTube watch URL, IG post, etc.) to override auto-fetch
-const SOCIAL_POPUP_AUTO_SHOW = true; // Show popup automatically when scan starts
+/* ============================================================
+   Social popup while scanning
+   ============================================================ */
+const socialPopup = $('socialPopup');
+const socialPopupFrame = $('socialPopupFrame');
+const socialPopupLink = $('socialPopupLink');
+const socialPopupClose = $('socialPopupClose');
+const socialPopupTitle = $('socialPopupTitle');
+
+function maybeShowSocialPopup() {
+    if (!SOCIAL_POPUP_AUTO_SHOW || !socialPopup) return;
+    if (SOCIAL_MANUAL_URL) {
+        showSocialPopup(null);
+        return;
+    }
+    fetchLatestYouTubeVideoId(SOCIAL_YOUTUBE_CHANNEL_ID).then(function (id) {
+        if (id) showSocialPopup(id);
+        else showSocialPopupFallback();
+    });
+}
+
+function showSocialPopup(videoId) {
+    if (!socialPopup) return;
+    const target = SOCIAL_MANUAL_URL || (videoId ? 'https://www.youtube.com/embed/' + videoId : '');
+    if (!target) { socialPopup.hidden = true; return; }
+    if (socialPopupTitle) socialPopupTitle.textContent = '🎬 Latest upload';
+    if (socialPopupLink) {
+        socialPopupLink.href = SOCIAL_MANUAL_URL || ('https://www.youtube.com/watch?v=' + videoId);
+        socialPopupLink.textContent = 'Watch on YouTube';
+        socialPopupLink.hidden = !SOCIAL_MANUAL_URL && !videoId;
+    }
+    if (socialPopupFrame) {
+        socialPopupFrame.src = target;
+        socialPopupFrame.hidden = !target;
+    }
+    socialPopup.hidden = false;
+}
+
+function hideSocialPopup() {
+    if (!socialPopup) return;
+    socialPopup.hidden = true;
+    if (socialPopupFrame) socialPopupFrame.src = '';
+}
+
+function showSocialPopupFallback() {
+    if (!socialPopup) return;
+    const channelUrl = 'https://www.youtube.com/channel/' + SOCIAL_YOUTUBE_CHANNEL_ID;
+    if (socialPopupTitle) socialPopupTitle.textContent = '🎬 Check out my channel';
+    if (socialPopupFrame) { socialPopupFrame.hidden = true; socialPopupFrame.src = ''; }
+    if (socialPopupLink) {
+        socialPopupLink.href = channelUrl;
+        socialPopupLink.textContent = 'Open YouTube channel';
+        socialPopupLink.hidden = false;
+    }
+    socialPopup.hidden = false;
+}
+
+function getYouTubeRssUrl(channel) {
+    return 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channel;
+}
+
+function fetchLatestYouTubeVideoId(channelId) {
+    const directUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
+    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
+    const doFetch = function (url) {
+        return fetch(url)
+            .then(function (r) { return r.text(); })
+            .then(function (xml) {
+                const m = xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+                return m ? m[1] : null;
+            });
+    };
+    return doFetch(directUrl).catch(function () {
+        return doFetch(proxyUrl);
+    }).catch(function () {
+        return null;
+    });
+}
+
+function fetchLatestYouTubeTitle(channelId) {
+    const directUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
+    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
+    const doFetch = function (url) {
+        return fetch(url)
+            .then(function (r) { return r.text(); })
+            .then(function (xml) {
+                const m = xml.match(/<title>([^<]+)<\/title>/);
+                return m ? m[1] : null;
+            });
+    };
+    return doFetch(directUrl).catch(function () {
+        return doFetch(proxyUrl);
+    }).catch(function () {
+        return null;
+    });
+}
 
 /* ---- State ---- */
 let allServers = [];          // [{ url, status: 'online'|'offline', code }]
@@ -97,17 +189,6 @@ const cardHint = $('cardHint');
 const updateBanner = $('updateBanner');
 const reloadBtn = $('reloadBtn');
 const dismissUpdateBtn = $('dismissUpdateBtn');
-const socialPopup = $('socialPopup');
-const socialPopupFrame = $('socialPopupFrame');
-const socialPopupLink = $('socialPopupLink');
-const socialPopupClose = $('socialPopupClose');
-const socialPopupTitle = $('socialPopupTitle');
-const youtubeShowcase = $('youtubeShowcase');
-const ytThumb = $('ytThumb');
-const ytTitle = $('ytTitle');
-const ytCard = $('ytCard');
-const socialFollowModal = $('socialFollowModal');
-const socialFollowHint = $('socialFollowHint');
 
 /* ---- Presets / config read helpers ---- */
 function getTimeoutMs() {
@@ -285,7 +366,7 @@ function recordResult(result) {
 
     updateStats();
     updateProgress(Math.round((processedUrls / totalUrls) * 100));
-    renderResults();
+    scheduleRender();
     maybeAutoscroll();
 
     if (processedUrls >= totalUrls && totalUrls > 0) finishScanning();
@@ -347,9 +428,14 @@ function renderResults() {
         : '';
 }
 
-function renderResultsAppend() {
-    /* cheap incremental append handled by full render (small enough at cap) */
-    renderResults();
+let renderScheduled = false;
+function scheduleRender() {
+    if (renderScheduled) return;
+    renderScheduled = true;
+    requestAnimationFrame(function () {
+        renderScheduled = false;
+        renderResults();
+    });
 }
 
 function maybeAutoscroll() {
@@ -434,7 +520,7 @@ function beginScan(presetEntries) {
 function parseList(text) {
     return text.trim().split('\n')
         .map(function (u) { return u.trim(); })
-        .filter(function (u) { return u; })
+        .filter(function (u) { return u && /^https?:\/\//i.test(u); })
         .map(function (u) { return { url: u, status: null, code: null }; });
 }
 
@@ -457,8 +543,12 @@ function pauseScanning() {
     showToast('Scan paused — in-flight requests finishing');
 }
 
+let scanFinished = false;
+
 function finishScanning() {
+    if (scanFinished) return;
     if (!scanningActive && processedUrls === 0 && totalUrls === 0) return;
+    scanFinished = true;
     scanningActive = false;
     scanningPaused = false;
     startStopBtn.textContent = 'Start Scan';
@@ -472,6 +562,8 @@ function finishScanning() {
         const unreachable = allServers.filter(function (e) { return e.status === 'offline'; });
         if (retryUnreachable.checked && !retryRoundActive && unreachable.length > 0) {
             retryRemaining = Math.max(1, Math.min(5, parseInt(retryAttempts.value, 10) || 2));
+            scanFinished = false;
+            scanningActive = true;
             showToast('Scan complete · ' + onlineCount + ' reachable. Retrying ' + unreachable.length + ' unreachable (' + retryRemaining + ' passes)…', true);
             if (soundOnComplete.checked) playBeep();
             showCompletionCta(onlineCount);
@@ -480,7 +572,8 @@ function finishScanning() {
             return;
         }
         if (retryRoundActive && retryRemaining > 0) {
-            /* more retry passes queued — start the next one */
+            scanFinished = false;
+            scanningActive = true;
             startRetryRound();
             return;
         }
@@ -501,9 +594,10 @@ function finishScanning() {
    catch slow-responding hosts. Runs up to retryRemaining times. */
 function startRetryRound() {
     retryRoundActive = true;
-    retryRemaining = (retryRemaining || 1) - 1;
-    const passNo = retryRemaining; /* 0 = last pass, higher = earlier */
-    scanTimeoutMult = Math.pow(2, passNo + 1); /* 2x, 4x, 8x … per pass */
+    const totalPasses = retryRemaining || 1;
+    retryRemaining = retryRemaining - 1;
+    const passNo = totalPasses - retryRemaining;
+    scanTimeoutMult = Math.pow(2, passNo);
     const unreachable = allServers
         .filter(function (e) { return e.status === 'offline'; })
         .map(function (e) { return { url: e.url, status: null, code: null }; });
@@ -855,16 +949,6 @@ function openCardModal() {
     cardHint.textContent = '';
 }
 
-function cardBlob() {
-    return new Promise(function (resolve) {
-        if (!shareCanvas.toBlob) {
-            shareCanvas.toBlob(function (b) { resolve(b); }, 'image/png');
-        } else {
-            shareCanvas.toBlob(function (b) { resolve(b); }, 'image/png');
-        }
-    });
-}
-
 function downloadCard() {
     const c = drawShareCard();
     if (!c) { showToast('Canvas unsupported'); return; }
@@ -1039,17 +1123,27 @@ function setupYouTubeShowcase() {
     const channelId = SOCIAL_YOUTUBE_CHANNEL_ID;
     if (!channelId) return;
 
-    fetchLatestYouTubeVideoId(channelId).then(function (videoId) {
-        if (!videoId) return;
-        ytThumb.src = 'https://img.youtube.com/vi/' + videoId + '/mqdefault.jpg';
-        ytCard.href = 'https://www.youtube.com/watch?v=' + videoId;
-        youtubeShowcase.hidden = false;
-
-        fetchLatestYouTubeTitle(channelId).then(function (title) {
-            if (title) ytTitle.textContent = title;
-        });
+    const directUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
+    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
+    const doFetch = function (url) {
+        return fetch(url)
+            .then(function (r) { return r.text(); })
+            .then(function (xml) {
+                const videoIdMatch = xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+                const titleMatch = xml.match(/<title>([^<]+)<\/title>/);
+                return { videoId: videoIdMatch ? videoIdMatch[1] : null, title: titleMatch ? titleMatch[1] : null };
+            });
+    };
+    doFetch(directUrl).catch(function () {
+        return doFetch(proxyUrl);
     }).catch(function () {
-        youtubeShowcase.hidden = true;
+        return null;
+    }).then(function (data) {
+        if (!data || !data.videoId) return;
+        ytThumb.src = 'https://img.youtube.com/vi/' + data.videoId + '/mqdefault.jpg';
+        ytCard.href = 'https://www.youtube.com/watch?v=' + data.videoId;
+        youtubeShowcase.hidden = false;
+        if (data.title) ytTitle.textContent = data.title;
     });
 }
 
@@ -1095,9 +1189,9 @@ document.addEventListener('DOMContentLoaded', function () {
     $('downloadBtn').addEventListener('click', downloadTxt);
     $('shareBtn').addEventListener('click', shareResults);
 
-    document.querySelectorAll('.seg-btn').forEach(function (btn) {
+    document.querySelectorAll('.pill').forEach(function (btn) {
         btn.addEventListener('click', function () {
-            document.querySelectorAll('.seg-btn').forEach(function (b) { b.classList.remove('active'); });
+            document.querySelectorAll('.pill').forEach(function (b) { b.classList.remove('active'); });
             btn.classList.add('active');
             currentFilter = btn.getAttribute('data-filter');
             renderResults();
@@ -1116,6 +1210,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (e.key === ' ' && !typing) { e.preventDefault(); toggleScanning(); }
         else if ((e.key === 'r' || e.key === 'R') && !typing) { resetScanning(); }
         else if (e.key === '/' && !typing) { e.preventDefault(); searchInput.focus(); }
+        else if (e.key === 'Escape') {
+            if (cardModal && !cardModal.hidden) { cardModal.hidden = true; }
+            if (socialFollowModal && !socialFollowModal.hidden) { hideSocialFollowModal(); }
+        }
     });
 
     if ('serviceWorker' in navigator) {

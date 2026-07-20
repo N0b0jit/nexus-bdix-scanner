@@ -35,6 +35,13 @@
     </div>
 
     <main class="app-container">
+        <!-- Update Banner -->
+        <div class="update-banner" id="updateBanner" hidden>
+            <span>New version available</span>
+            <button class="btn btn-small" id="reloadBtn">Reload</button>
+            <button class="btn btn-small ghost" id="dismissUpdateBtn">Dismiss</button>
+        </div>
+
         <!-- Header -->
         <header class="app-header">
             <div class="header-content">
@@ -190,6 +197,11 @@
                                 <input type="checkbox" id="soundOnComplete">
                                 <span class="toggle-slider"></span>
                                 <span class="toggle-label">Sound</span>
+                            </label>
+                            <label class="toggle">
+                                <input type="checkbox" id="notifyToggle">
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-label">Notifications</span>
                             </label>
                         </div>
 
@@ -388,6 +400,16 @@
                 <span class="yt-title" id="ytTitle">Loading...</span>
             </div>
         </a>
+    </div>
+
+    <!-- Social popup while scanning -->
+    <div class="social-popup" id="socialPopup" hidden aria-label="Latest social post">
+        <button class="social-popup-x" id="socialPopupClose" aria-label="Close">&times;</button>
+        <p class="social-popup-title" id="socialPopupTitle">🎬 Latest upload</p>
+        <div class="social-popup-embed">
+            <iframe id="socialPopupFrame" src="" allow="autoplay; encrypted-media" allowfullscreen hidden></iframe>
+            <a id="socialPopupLink" class="social-popup-link" href="#" target="_blank" rel="noopener" hidden>Watch on YouTube</a>
+        </div>
     </div>
 
     <script src="script.js"></script>
