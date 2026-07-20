@@ -1125,10 +1125,17 @@ function hideSocialFollowModal() {
 }
 
 /* ============================================================
-   Wiring
-   ============================================================ */
-document.addEventListener('DOMContentLoaded', function () {
-    if (startStopBtn) startStopBtn.addEventListener('click', toggleScanning);
+    Wiring
+    ============================================================ */
+function init() {
+    console.log('BDIX Radar init running');
+    if (startStopBtn) {
+        console.log('Attaching click to startStopBtn');
+        startStopBtn.addEventListener('click', function (e) {
+            console.log('Start/Stop clicked, scanningActive=' + scanningActive);
+            toggleScanning();
+        });
+    }
     if (resetBtn) resetBtn.addEventListener('click', resetScanning);
     if (searchInput) searchInput.addEventListener('input', renderResults);
     $('copyOnlineBtn').addEventListener('click', function () {
@@ -1236,7 +1243,13 @@ document.addEventListener('DOMContentLoaded', function () {
     prefetchServerList();
     setupYouTubeShowcase();
     setTimeout(function () { showSocialFollowModal(false); }, 8000);
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
 
 function hideCardModal() {
     if (!cardModal) return;
