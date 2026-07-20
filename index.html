@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus BDIX Scanner — Find Live BDIX & FTP Servers</title>
+    <meta name="description" content="Scan and discover available BDIX & FTP servers from your ISP in parallel — free, fast, fully static. Built by @n0b0jit_nexus.">
+    <meta name="keywords" content="BDIX, FTP, BDIX scanner, BDIX server list, Bangladesh ISP, FTP server finder, Nexus BDIX">
+    <meta name="author" content="@n0b0jit_nexus">
+    <meta name="theme-color" content="#060814">
+    <link rel="canonical" href="https://nexus-bdix-scanner.netlify.app/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Nexus BDIX Scanner">
+    <meta property="og:title" content="Nexus BDIX Scanner — Find Live BDIX & FTP Servers">
+    <meta property="og:description" content="Scan thousands of BDIX & FTP servers from your ISP in parallel. Free, fast, fully static. By @n0b0jit_nexus.">
+    <meta property="og:image" content="https://nexus-bdix-scanner.netlify.app/og-image.png">
+    <meta property="og:url" content="https://nexus-bdix-scanner.netlify.app/">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter / X card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Nexus BDIX Scanner — Find Live BDIX & FTP Servers">
+    <meta name="twitter:description" content="Scan thousands of BDIX & FTP servers from your ISP in parallel. Free & static. By @n0b0jit_nexus.">
+    <meta name="twitter:image" content="https://nexus-bdix-scanner.netlify.app/og-image.png">
+    <meta name="twitter:creator" content="@n0b0jit_nexus">
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#060814">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-layer" aria-hidden="true">
+        <span class="orb orb-1"></span>
+        <span class="orb orb-2"></span>
+        <span class="orb orb-3"></span>
+        <div class="grid-noise"></div>
+    </div>
+
+    <main class="container">
+        <header class="hero">
+            <div class="badge">
+                <span class="badge-dot"></span> BDIX Network Tool
+                <span class="visitors-badge" id="visitorsBadge" hidden>👁 <span id="visitorsCount">0</span></span>
+            </div>
+            <h1 class="title">Nexus <span class="title-accent">BDIX Scanner</span></h1>
+            <p class="subtitle">Probe thousands of BDIX &amp; FTP servers from your ISP in parallel and watch them light up live.</p>
+            <div class="creator-bar" id="creatorBar">
+                <a class="creator-chip" href="https://t.me/n0b0jit_nexus" target="_blank" rel="noopener">
+                    <span class="chip-ico">✈</span> Join @n0b0jit_nexus
+                </a>
+                <a class="creator-chip alt" href="https://linktr.ee/mr_nobojit.m" target="_blank" rel="noopener">
+                    <span class="chip-ico">🔗</span> Linktree
+                </a>
+                <a class="creator-chip github" href="https://github.com/n0b0jit/nexus-bdix-scanner" target="_blank" rel="noopener" title="Star us on GitHub">
+                    <span class="chip-ico">⭐</span> Star on GitHub
+                </a>
+                <a class="creator-chip support" href="https://linktr.ee/mr_nobojit.m" target="_blank" rel="noopener" title="Support the project (tips via Linktree)">
+                    <span class="chip-ico">☕</span> Support
+                </a>
+            </div>
+            <div class="youtube-showcase" id="youtubeShowcase" hidden>
+                <a class="yt-card" id="ytCard" href="#" target="_blank" rel="noopener">
+                    <div class="yt-thumb-wrap">
+                        <img class="yt-thumb" id="ytThumb" src="" alt="Latest YouTube video thumbnail" loading="lazy">
+                        <span class="yt-play">▶</span>
+                    </div>
+                    <div class="yt-meta">
+                        <span class="yt-label">🎬 Latest Upload</span>
+                        <span class="yt-title" id="ytTitle">Loading…</span>
+                    </div>
+                </a>
+            </div>
+        </header>
+
+        <section class="stats" aria-label="Scan statistics">
+            <article class="stat-card glass" data-tone="online">
+                <span class="stat-label">Reachable</span>
+                <span class="stat-value" id="onlineCount">0</span>
+                <span class="stat-spark"></span>
+            </article>
+            <article class="stat-card glass" data-tone="offline">
+                <span class="stat-label">Unreachable</span>
+                <span class="stat-value" id="offlineCount">0</span>
+                <span class="stat-spark"></span>
+            </article>
+            <article class="stat-card glass">
+                <span class="stat-label">Processed</span>
+                <span class="stat-value" id="totalCount">0</span>
+            </article>
+            <article class="stat-card glass" data-tone="progress">
+                <span class="stat-label">Progress</span>
+                <span class="stat-value" id="progressPercent">0%</span>
+            </article>
+            <article class="stat-card glass">
+                <span class="stat-label">Elapsed</span>
+                <span class="stat-value mono" id="elapsedTime">00:00:00</span>
+            </article>
+            <article class="stat-card glass">
+                <span class="stat-label">ETA</span>
+                <span class="stat-value mono" id="etaTime">--:--:--</span>
+            </article>
+            <article class="stat-card glass" data-tone="progress">
+                <span class="stat-label">Scanning Now</span>
+                <span class="stat-value mono" id="activeCount">0</span>
+            </article>
+        </section>
+
+        <section class="panel glass" aria-label="Controls">
+            <div class="control">
+                <label for="timeOutValue">Timeout (sec)</label>
+                <input type="number" value="8" id="timeOutValue" min="1" max="60" aria-label="Request timeout in seconds">
+            </div>
+            <div class="control">
+                <label for="concurrencyValue">Concurrency</label>
+                <input type="number" value="8" id="concurrencyValue" min="1" max="64" aria-label="Parallel workers">
+            </div>
+            <div class="control control-inline">
+                <label class="switch">
+                    <input type="checkbox" id="autoscroll" checked aria-label="Auto scroll results">
+                    <span class="switch-track"><span class="switch-thumb"></span></span>
+                    Autoscroll
+                </label>
+            </div>
+            <div class="control control-inline">
+                <label class="switch">
+                    <input type="checkbox" id="accurateProbe" aria-label="Accurate probe via CORS proxy">
+                    <span class="switch-track"><span class="switch-thumb"></span></span>
+                    Accurate probe
+                </label>
+            </div>
+            <div class="control control-inline">
+                <label class="switch">
+                    <input type="checkbox" id="retryUnreachable" aria-label="Auto-retry unreachable servers">
+                    <span class="switch-track"><span class="switch-thumb"></span></span>
+                    Retry unreachable
+                </label>
+            </div>
+            <div class="control">
+                <label for="retryAttempts">Retry attempts</label>
+                <input type="number" value="2" id="retryAttempts" min="1" max="5" aria-label="Number of retry passes">
+            </div>
+            <div class="control control-inline">
+                <label class="switch">
+                    <input type="checkbox" id="soundOnComplete" aria-label="Sound on complete">
+                    <span class="switch-track"><span class="switch-thumb"></span></span>
+                    Sound on complete
+                </label>
+            </div>
+            <div class="control control-inline">
+                <label class="switch">
+                    <input type="checkbox" id="notifyToggle" aria-label="Enable push notifications">
+                    <span class="switch-track"><span class="switch-thumb"></span></span>
+                    Enable notifications
+                </label>
+            </div>
+            <div class="control">
+                <label for="customListFile">Server list</label>
+                <div class="file-row">
+                    <input type="file" id="customListFile" accept=".txt" aria-label="Load custom server list">
+                    <span class="list-meta" id="customListMeta"></span>
+                    <button type="button" class="btn btn-mini" id="clearCustomListBtn" hidden>Clear</button>
+                </div>
+            </div>
+            <div class="control actions">
+                <button id="startStopBtn" class="btn btn-primary" aria-label="Start scanning">Start Scan</button>
+                <button id="resetBtn" class="btn btn-ghost" aria-label="Reset scan">Reset</button>
+            </div>
+        </section>
+        <p class="hint-line">
+            <strong>Accurate probe</strong> uses free third-party CORS proxies (allorigins / corsproxy) — slower, real HTTP status.
+            Shortcuts: <kbd>Space</kbd> start/stop · <kbd>R</kbd> reset · <kbd>/</kbd> search.
+        </p>
+
+        <section class="progress-wrap" aria-label="Overall progress">
+            <div class="progress-ring-wrap">
+                <svg class="progress-ring" viewBox="0 0 120 120" aria-hidden="true">
+                    <circle class="ring-bg" cx="60" cy="60" r="52"></circle>
+                    <circle class="ring-fg" id="progressRing" cx="60" cy="60" r="52"></circle>
+                </svg>
+                <div class="ring-label">
+                    <span id="ringPercent">0%</span>
+                </div>
+            </div>
+            <div class="progress-bar-col">
+                <div class="progress-track glass">
+                    <div class="progress-fill" id="progressBar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                        <span class="progress-shine"></span>
+                    </div>
+                </div>
+                <div class="current-url glass" id="currentUrlContainer" style="display:none;">
+                    <span class="pulse-dot"></span>
+                    <span id="currentUrl"></span>
+                </div>
+            </div>
+        </section>
+
+        <section class="toolbar glass" aria-label="Search and export">
+            <div class="toolbar-row">
+                <div class="search-wrap">
+                    <span class="search-ico">🔍</span>
+                    <input type="text" id="searchInput" placeholder="Filter results by URL…  ( / )" aria-label="Filter results">
+                </div>
+                <div class="filter-seg" role="group" aria-label="Quick filter">
+                    <button class="seg-btn active" data-filter="all">All</button>
+                    <button class="seg-btn" data-filter="online">Reachable</button>
+                    <button class="seg-btn" data-filter="offline">Unreachable</button>
+                </div>
+            </div>
+            <div class="toolbar-row">
+                <button class="btn btn-mini" id="copyOnlineBtn">Copy Reachable</button>
+                <button class="btn btn-mini" id="copyOfflineBtn">Copy Unreachable</button>
+                <button class="btn btn-mini" id="downloadBtn">Download .txt</button>
+                <button class="btn btn-mini" id="shareBtn">Share results</button>
+                <button class="btn btn-mini" id="shareCardBtn">Share card</button>
+            </div>
+        </section>
+
+        <section class="results" aria-label="Scan results">
+            <div class="results-col glass">
+                <header class="results-head">
+                    <h2 class="results-title online-title">Reachable</h2>
+                    <span class="count-pill online-pill" id="onlinePill">0</span>
+                </header>
+                <ul id="urlList" class="url-list" aria-live="polite"></ul>
+                <p class="render-note" id="renderNoteOnline"></p>
+            </div>
+            <div class="results-col glass">
+                <header class="results-head">
+                    <h2 class="results-title offline-title">Unreachable</h2>
+                    <span class="count-pill offline-pill" id="offlinePill">0</span>
+                </header>
+                <ul id="urlList2" class="url-list" aria-live="polite"></ul>
+                <p class="render-note" id="renderNoteOffline"></p>
+            </div>
+        </section>
+
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+        <!-- Feature 3: Telegram deep-link CTA shown on completion -->
+        <section class="cta-card glass" id="completionCta" hidden aria-label="Join creator">
+            <div class="cta-text">
+                <strong>Join @n0b0jit_nexus for fresh server lists</strong>
+                <span>Get the latest BDIX server URLs straight from the source.</span>
+            </div>
+            <a class="btn btn-primary" id="telegramCtaBtn" target="_blank" rel="noopener">Join on Telegram</a>
+        </section>
+
+        <!-- Feature 10: Submit a server -->
+        <section class="submit glass" aria-label="Submit a server">
+            <h2 class="submit-title">Know a server we're missing?</h2>
+            <p class="submit-sub">Submit it — we'll review and add it to the list.</p>
+            <form id="submitForm" class="submit-row" autocomplete="off">
+                <input type="url" id="submitUrl" class="submit-input" placeholder="https://ftp.example.com" aria-label="Server URL" required>
+                <input type="text" id="submitNote" class="submit-input" placeholder="Optional note" aria-label="Optional note">
+                <button type="submit" class="btn btn-mini">Submit</button>
+            </form>
+            <p class="submit-note">Opens a pre-filled GitHub issue / Telegram message (no token needed). Real auto-commit requires a repo token — see README.</p>
+        </section>
+    </main>
+
+    <!-- Feature 1: Share card modal -->
+    <div class="modal" id="cardModal" hidden>
+        <div class="modal-backdrop" data-close-card></div>
+        <div class="modal-box glass" role="dialog" aria-modal="true" aria-label="Share card">
+            <button class="modal-x" data-close-card aria-label="Close">×</button>
+            <h3 class="modal-title">Your scan share card</h3>
+            <canvas id="shareCanvas" width="1200" height="630" class="share-canvas"></canvas>
+            <div class="modal-actions">
+                <button class="btn btn-mini" id="downloadCardBtn">Download card</button>
+                <button class="btn btn-mini" id="copyCardBtn">Copy image</button>
+                <button class="btn btn-mini" id="copyCardTextBtn">Copy text</button>
+            </div>
+            <p class="modal-hint" id="cardHint"></p>
+        </div>
+    </div>
+
+    <!-- Social follow modal (Facebook / Instagram) -->
+    <div class="modal" id="socialFollowModal" hidden>
+        <div class="modal-backdrop" data-close-social></div>
+        <div class="modal-box glass" role="dialog" aria-modal="true" aria-label="Follow on social media">
+            <button class="modal-x" data-close-social aria-label="Close">×</button>
+            <h3 class="modal-title">Stay Connected 🚀</h3>
+            <p class="social-follow-sub">Follow for the latest BDIX servers, updates, and tech content.</p>
+            <div class="social-follow-grid">
+                <a class="social-follow-card fb" href="https://www.facebook.com/n0b0jit.nexus" target="_blank" rel="noopener">
+                    <span class="social-follow-ico">📘</span>
+                    <span class="social-follow-name">Facebook</span>
+                    <span class="social-follow-handle">@n0b0jit.nexus</span>
+                </a>
+                <a class="social-follow-card ig" href="https://www.instagram.com/n0b0jit_nexus" target="_blank" rel="noopener">
+                    <span class="social-follow-ico">📸</span>
+                    <span class="social-follow-name">Instagram</span>
+                    <span class="social-follow-handle">@n0b0jit_nexus</span>
+                </a>
+            </div>
+            <p class="modal-hint" id="socialFollowHint"></p>
+        </div>
+    </div>
+
+    <!-- Feature 19: PWA update banner -->
+    <div class="update-banner" id="updateBanner" hidden>
+        <span>New version available</span>
+        <button class="btn btn-mini" id="reloadBtn">Reload</button>
+        <button class="btn btn-mini ghost" id="dismissUpdateBtn">Dismiss</button>
+    </div>
+
+    <!-- Social popup while scanning -->
+    <div class="social-popup" id="socialPopup" hidden aria-label="Latest social post">
+        <button class="social-popup-x" id="socialPopupClose" aria-label="Close">×</button>
+        <p class="social-popup-title" id="socialPopupTitle">🎬 Latest upload</p>
+        <div class="social-popup-embed">
+            <iframe id="socialPopupFrame" src="" allow="autoplay; encrypted-media" allowfullscreen hidden></iframe>
+            <a id="socialPopupLink" class="social-popup-link" href="#" target="_blank" rel="noopener" hidden>Watch on YouTube</a>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-links">
+            <a href="https://t.me/n0b0jit_nexus" target="_blank" rel="noopener">Telegram</a>
+            <a href="https://linktr.ee/mr_nobojit.m" target="_blank" rel="noopener">Linktree</a>
+        </div>
+        <p class="footer-credit">Nexus BDIX Scanner · by <a href="https://t.me/n0b0jit_nexus" target="_blank" rel="noopener">@n0b0jit_nexus</a></p>
+    </footer>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Nexus BDIX Scanner",
+      "url": "https://nexus-bdix-scanner.netlify.app/",
+      "description": "Scan and discover available BDIX & FTP servers from your ISP in parallel — free, fast, fully static.",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "@n0b0jit_nexus",
+        "url": "https://t.me/n0b0jit_nexus"
+      },
+      "sameAs": [
+        "https://t.me/n0b0jit_nexus",
+        "https://linktr.ee/mr_nobojit.m"
+      ]
+    }
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>

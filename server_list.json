@@ -1,0 +1,38 @@
+[
+    {
+        "url": "all_servers.txt",
+        "contributor": "All Servers (Merged)"
+    },
+    {
+        "url": "1.txt",
+        "contributor": "Server 1"
+    },
+    {
+        "url": "2.txt",
+        "contributor": "Server 2"
+    },
+    {
+        "url": "3.txt",
+        "contributor": "Server 3"
+    },
+    {
+        "url": "4.txt",
+        "contributor": "Server 4"
+    },
+    {
+        "url": "5.txt",
+        "contributor": "Server 5"
+    },
+    {
+        "url": "6.txt",
+        "contributor": "Server 6"
+    },
+    {
+        "url": "7.txt",
+        "contributor": "Server 7"
+    },
+    {
+        "url": "MosterFTP.txt",
+        "contributor": "MosterFTP"
+    }
+]

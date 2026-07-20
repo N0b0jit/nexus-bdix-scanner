@@ -1,0 +1,18 @@
+{
+  "name": "Nexus BDIX Scanner",
+  "short_name": "BDIX Scanner",
+  "description": "Scan and discover available BDIX FTP servers from your ISP — parallel, free, fully static.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#060814",
+  "theme_color": "#060814",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
