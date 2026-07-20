@@ -7,71 +7,71 @@
     <link rel="stylesheet" href="style.css">
     <style>
         body { padding-bottom: 0; }
-        .container { padding: 1rem; }
-        .creator-bar { position: static; margin-top: 0.8rem; }
-        /* Hide heavy bits not needed in embed */
-        .stats, .progress-wrap, .toolbar, .hint-line, footer, .bg-layer { display: none; }
-        .embed-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; }
-        .embed-head h1 { font-size: 1.4rem; }
-        .embed-head .title-accent { font-size: 1.4rem; }
+        .app-container { padding: 1rem; }
+        .app-header { position: static; margin: 0 0 1rem; padding: 1rem; }
+        .stats-section, .progress-section, .toolbar-section, .submit-section, .app-footer, .ambient-bg { display: none; }
+        .results-grid { grid-template-columns: 1fr; }
+        .results-panel { max-height: 420px; }
     </style>
-
-    <!-- Vercel Analytics (static site snippet) -->
-    <script>
-      window.va = window.va || function () { (window.va.a = window.va.a || []).push(arguments); }
-      window.va.l = Date.now();
-    </script>
-    <script src="/_vercel/insights/script.js" defer></script>
 </head>
 <body>
-    <div class="bg-layer" aria-hidden="true">
-        <span class="orb orb-1"></span>
-        <span class="orb orb-2"></span>
-        <span class="orb orb-3"></span>
-        <div class="grid-noise"></div>
+    <div class="ambient-bg" aria-hidden="true">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
     </div>
-    <main class="container">
-        <header class="hero" style="margin-bottom:1rem;">
-            <div class="embed-head">
-                <h1 class="title">Nexus <span class="title-accent">BDIX Scanner</span></h1>
-                <span class="stat-value mono" id="embedStatus">Idle</span>
-            </div>
-            <div class="creator-bar" id="creatorBar">
-                <a class="creator-chip" href="https://t.me/n0b0jit_nexus" target="_blank" rel="noopener">
-                    <span class="chip-ico">✈</span> Join @n0b0jit_nexus
-                </a>
-                <a class="creator-chip alt" href="https://linktr.ee/mr_nobojit.m" target="_blank" rel="noopener">
-                    <span class="chip-ico">🔗</span> Linktree
-                </a>
-                <a class="creator-chip github" href="https://github.com/n0b0jit/nexus-bdix-scanner" target="_blank" rel="noopener" title="Star us on GitHub">
-                    <span class="chip-ico">⭐</span> Star
-                </a>
-            </div>
-            <div class="control actions" style="margin-top:0.8rem; justify-content:flex-start;">
-                <button id="startStopBtn" class="btn btn-primary">Start Scan</button>
-                <button id="resetBtn" class="btn btn-ghost">Reset</button>
-                <span class="stat-label" style="margin-left:0.5rem;">Reachable: <b id="onlineCount">0</b> · Unreachable: <b id="offlineCount">0</b></span>
+    <main class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="brand">
+                    <div class="logo">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="32" height="32" rx="8" fill="url(#logo-gradient)"/>
+                            <path d="M16 8L22 14H18V22H14V14H10L16 8Z" fill="white"/>
+                            <defs>
+                                <linearGradient id="logo-gradient" x1="0" y1="0" x2="32" y2="32">
+                                    <stop stop-color="#818cf8"/>
+                                    <stop offset="1" stop-color="#22d3ee"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                    <div class="brand-text">
+                        <h1 class="app-title">Nexus <span class="gradient-text">BDIX Scanner</span></h1>
+                        <p class="app-subtitle">Discover live BDIX & FTP servers</p>
+                    </div>
+                </div>
+                <nav class="social-links">
+                    <a href="https://t.me/n0b0jit_nexus" target="_blank" rel="noopener" class="social-link" aria-label="Join Telegram">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                    </a>
+                    <a href="https://github.com/n0b0jit/nexus-bdix-scanner" target="_blank" rel="noopener" class="social-link" aria-label="Star on GitHub">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    </a>
+                </nav>
             </div>
         </header>
 
-        <section class="results" aria-label="Scan results">
-            <div class="results-col glass">
-                <header class="results-head">
-                    <h2 class="results-title online-title">Reachable</h2>
-                    <span class="count-pill online-pill" id="onlinePill">0</span>
-                </header>
-                <ul id="urlList" class="url-list"></ul>
-            </div>
-            <div class="results-col glass">
-                <header class="results-head">
-                    <h2 class="results-title offline-title">Unreachable</h2>
-                    <span class="count-pill offline-pill" id="offlinePill">0</span>
-                </header>
-                <ul id="urlList2" class="url-list"></ul>
+        <section class="results-section" aria-label="Scan results">
+            <div class="results-grid">
+                <div class="results-panel">
+                    <header class="results-header">
+                        <h2 class="results-title">Reachable</h2>
+                        <span class="results-count" id="onlinePill">0</span>
+                    </header>
+                    <ul id="urlList" class="results-list" aria-live="polite"></ul>
+                </div>
+                <div class="results-panel">
+                    <header class="results-header">
+                        <h2 class="results-title">Unreachable</h2>
+                        <span class="results-count offline" id="offlinePill">0</span>
+                    </header>
+                    <ul id="urlList2" class="results-list" aria-live="polite"></ul>
+                </div>
             </div>
         </section>
 
-        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+        <div class="toast-container" id="toast" role="status" aria-live="polite"></div>
     </main>
 
     <script src="script.js"></script>
